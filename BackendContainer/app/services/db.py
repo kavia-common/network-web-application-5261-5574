@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from pymongo import MongoClient, ASCENDING
 from pymongo.collection import Collection
 from pymongo.errors import DuplicateKeyError, PyMongoError
+from bson import ObjectId
 from datetime import datetime
 
 from app.config import Config
@@ -95,26 +96,52 @@ def get_collection() -> Collection:
         raise
 
 
+def _normalize_dates(doc: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Convert last_ping_time from ISO string to datetime for DB write operations.
+    """
+    out = dict(doc)
+    if "last_ping_time" in out and isinstance(out["last_ping_time"], str):
+        try:
+            out["last_ping_time"] = datetime.fromisoformat(out["last_ping_time"])
+        except ValueError:
+            # Remove invalid date so schema can still pass if optional
+            out.pop("last_ping_time", None)
+    return out
+
+
+def _serialize_device(doc: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Serialize Mongo document to JSON-friendly dict.
+    """
+    data = dict(doc)
+    if "_id" in data and isinstance(data["_id"], ObjectId):
+        data["_id"] = str(data["_id"])
+    if "last_ping_time" in data and isinstance(data["last_ping_time"], datetime):
+        data["last_ping_time"] = data["last_ping_time"].isoformat()
+    return data
+
+
+def _parse_object_id(id_str: str) -> ObjectId:
+    """
+    Safely parse an ObjectId from string or raise ValueError.
+    """
+    try:
+        return ObjectId(id_str)
+    except Exception:
+        raise ValueError("Invalid ObjectId")
+
+
 # PUBLIC_INTERFACE
 def insert_device(device: Dict[str, Any]) -> str:
     """Insert a new device document. Returns inserted_id as str."""
     col = get_collection()
-    # Normalize fields
-    doc = dict(device)
-    # Convert last_ping_time if provided as ISO string
-    if "last_ping_time" in doc and isinstance(doc["last_ping_time"], str):
-        try:
-            doc["last_ping_time"] = datetime.fromisoformat(doc["last_ping_time"])
-        except ValueError:
-            # Let Mongo validator handle wrong types or remove invalid date
-            doc.pop("last_ping_time", None)
-
+    doc = _normalize_dates(device)
     try:
         result = col.insert_one(doc)
         return str(result.inserted_id)
-    except DuplicateKeyError as e:
-        logger.info("Duplicate key error on insert: %s", e)
-        # Determine which field caused duplicate if possible
+    except DuplicateKeyError:
+        logger.info("Duplicate key error on insert")
         raise
     except PyMongoError:
         logger.exception("Database error during insert")
@@ -125,20 +152,22 @@ def insert_device(device: Dict[str, Any]) -> str:
 def find_devices(
     filter_query: Optional[Dict[str, Any]] = None,
     sort: Optional[List[Tuple[str, int]]] = None,
+    limit: Optional[int] = None,
+    skip: Optional[int] = None,
 ) -> List[Dict[str, Any]]:
-    """Find devices matching a filter and optional sort."""
+    """Find devices matching a filter and optional sort/pagination."""
     col = get_collection()
     filter_query = filter_query or {}
     cursor = col.find(filter_query)
     if sort:
         cursor = cursor.sort(sort)
+    if skip is not None:
+        cursor = cursor.skip(int(skip))
+    if limit is not None:
+        cursor = cursor.limit(int(limit))
     items: List[Dict[str, Any]] = []
     for item in cursor:
-        item["_id"] = str(item["_id"])
-        # Convert datetime to isoformat
-        if "last_ping_time" in item and isinstance(item["last_ping_time"], datetime):
-            item["last_ping_time"] = item["last_ping_time"].isoformat()
-        items.append(item)
+        items.append(_serialize_device(item))
     return items
 
 
@@ -147,7 +176,7 @@ def update_device(
     filter_query: Dict[str, Any],
     update_doc: Dict[str, Any],
 ) -> Dict[str, int]:
-    """Update a device using filter and update document. Returns matched and modified counts."""
+    """Update multiple devices using filter and update document. Returns matched and modified counts."""
     col = get_collection()
     try:
         res = col.update_many(filter_query, update_doc)
@@ -169,4 +198,73 @@ def delete_device(filter_query: Dict[str, Any]) -> Dict[str, int]:
         return {"deleted_count": res.deleted_count}
     except PyMongoError:
         logger.exception("Database error during delete")
+        raise
+
+
+# PUBLIC_INTERFACE
+def get_by_id(id_str: str) -> Optional[Dict[str, Any]]:
+    """Get a single device by ObjectId string. Returns serialized device or None."""
+    col = get_collection()
+    oid = _parse_object_id(id_str)
+    doc = col.find_one({"_id": oid})
+    return _serialize_device(doc) if doc else None
+
+
+# PUBLIC_INTERFACE
+def replace_one_by_id(id_str: str, new_doc: Dict[str, Any]) -> Dict[str, Any]:
+    """Replace a device document by id. Returns the updated document."""
+    col = get_collection()
+    oid = _parse_object_id(id_str)
+    to_set = _normalize_dates(new_doc)
+    # Ensure _id is preserved and not overwritten by client
+    to_set.pop("_id", None)
+    try:
+        res = col.replace_one({"_id": oid}, to_set, upsert=False)
+        if res.matched_count == 0:
+            # caller decides 404
+            return {}
+        # Return the updated document
+        doc = col.find_one({"_id": oid})
+        return _serialize_device(doc) if doc else {}
+    except DuplicateKeyError:
+        logger.info("Duplicate key error on replace")
+        raise
+    except PyMongoError:
+        logger.exception("Database error during replace")
+        raise
+
+
+# PUBLIC_INTERFACE
+def update_one_by_id(id_str: str, partial: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Apply a partial update to a device by id. Returns updated document or None if not found."""
+    col = get_collection()
+    oid = _parse_object_id(id_str)
+    update_fields = _normalize_dates(partial)
+    update_fields.pop("_id", None)
+    if not update_fields:
+        return None
+    try:
+        res = col.update_one({"_id": oid}, {"$set": update_fields})
+        if res.matched_count == 0:
+            return None
+        doc = col.find_one({"_id": oid})
+        return _serialize_device(doc) if doc else None
+    except DuplicateKeyError:
+        logger.info("Duplicate key error on partial update")
+        raise
+    except PyMongoError:
+        logger.exception("Database error during partial update")
+        raise
+
+
+# PUBLIC_INTERFACE
+def delete_one_by_id(id_str: str) -> bool:
+    """Delete a device by id. Returns True if deleted, False if not found."""
+    col = get_collection()
+    oid = _parse_object_id(id_str)
+    try:
+        res = col.delete_one({"_id": oid})
+        return res.deleted_count == 1
+    except PyMongoError:
+        logger.exception("Database error during delete by id")
         raise

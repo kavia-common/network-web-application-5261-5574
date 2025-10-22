@@ -4,11 +4,13 @@ This Flask backend provides RESTful CRUD endpoints for managing network devices 
 
 ## Features
 
-- CRUD endpoints:
-  - POST /device/insert
-  - POST /device/find
-  - POST /device/update
-  - POST /device/delete
+- RESTful CRUD endpoints:
+  - POST /devices (create)
+  - GET /devices (list with optional filters)
+  - GET /devices/{id} (get by id)
+  - PUT /devices/{id} (full replace, idempotent)
+  - PATCH /devices/{id} (partial update)
+  - DELETE /devices/{id} (delete by id)
 - Health check: GET /
 - MongoDB integration via `pymongo`
 - Collection JSON schema validator and unique indexes on `name` and `ip_address`
@@ -16,6 +18,8 @@ This Flask backend provides RESTful CRUD endpoints for managing network devices 
 - Logging with configurable level
 - OpenAPI documentation via `flask-smorest` at `/docs`
 - Optional async ping utility scaffold (`app/utils/ping.py`)
+
+Legacy endpoints `/device/insert`, `/device/find`, `/device/update`, and `/device/delete` have been removed in favor of RESTful routes.
 
 ## Requirements
 
@@ -52,25 +56,38 @@ python run.py
 
 The API will be available on `http://localhost:3001` and documentation at `http://localhost:3001/docs`.
 
-## API Overview
+## REST API Overview
 
-- POST `/device/insert`
+- POST `/devices`
   - Body: `{ "name": "...", "ip_address": "...", "type": "...", "location": "...", "status": "online|offline", "last_ping_time": "ISO-8601" }`
-  - Response: `{ "inserted_id": "<ObjectId as string>" }`
+  - Response: `201 { "inserted_id": "<ObjectId as string>" }`
+  - Errors: `400` on validation/duplicate, `500` on DB error
 
-- POST `/device/find`
-  - Body: `{ "filter": {...}, "sort": [["name", 1]] }` (both optional)
-  - Response: `[ Device, ... ]`
+- GET `/devices`
+  - Query params (optional): `name, ip_address, type, status, location, sort=name:asc, limit, skip`
+  - Response: `200 [ Device, ... ]`
 
-- POST `/device/update`
-  - Body: `{ "filter": {...}, "update": { "$set": { ... } } }`
-  - Response: `{ "matched_count": N, "modified_count": M }`
+- GET `/devices/{id}`
+  - Response: `200 Device`
+  - Errors: `400` invalid ObjectId, `404` not found
 
-- POST `/device/delete`
-  - Body: `{ "filter": {...} }`
-  - Response: `{ "deleted_count": N }`
+- PUT `/devices/{id}`
+  - Body (full document, all required fields): `{ "name": "...", "ip_address": "...", "type": "...", "location": "...", "status": "online|offline", "last_ping_time": "ISO-8601" }`
+  - Semantics: Full replace (idempotent). Returns updated device.
+  - Responses: `200 Device`, `404` if not found, `400` invalid ObjectId/payload, `409` duplicate key
 
-All endpoints return appropriate error messages for validation errors, duplicate keys, and database errors.
+- PATCH `/devices/{id}`
+  - Body (partial): any subset of fields above
+  - Responses: `200 Device`, `404` if not found, `400` invalid ObjectId/payload, `409` duplicate key
+
+- DELETE `/devices/{id}`
+  - Response: `204` on success (no body) or `404` if not found
+  - Errors: `400` invalid ObjectId
+
+All endpoints return JSON error payloads such as:
+```
+{ "error": "<ErrorType>", "details": "<message or dict>" }
+```
 
 ## Notes
 

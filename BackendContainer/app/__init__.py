@@ -15,7 +15,7 @@ app = Flask(__name__)
 app.url_map.strict_slashes = False
 
 # CORS: allow all origins (can be restricted via env if needed)
-CORS(app, resources={r"/*": {"origins": "*"}})
+CORS(app)
 
 # OpenAPI/Swagger config
 app.config["API_TITLE"] = "Network Device Management API"

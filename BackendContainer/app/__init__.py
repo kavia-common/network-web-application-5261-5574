@@ -24,6 +24,7 @@ app.config["OPENAPI_VERSION"] = "3.0.3"
 app.config["OPENAPI_URL_PREFIX"] = "/docs"
 app.config["OPENAPI_SWAGGER_UI_PATH"] = ""
 app.config["OPENAPI_SWAGGER_UI_URL"] = "https://cdn.jsdelivr.net/npm/swagger-ui-dist/"
+app.config["CORS_HEADERS"] = "Content-Type"
 
 api = Api(app, spec_kwargs={"title": app.config["API_TITLE"], "version": app.config["API_VERSION"]})
 api.register_blueprint(health_blp)

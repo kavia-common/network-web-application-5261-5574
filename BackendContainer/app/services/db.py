@@ -20,7 +20,9 @@ def _get_client() -> MongoClient:
     global _client
     if _client is None:
         logger.info("Initializing MongoDB client")
-        _client = MongoClient(Config.MONGO_URI, uuidRepresentation="standard")
+        db_uri_link = "mongodb+srv://db_user:vettel%402012@cluster0.htz84wq.mongodb.net/network?retryWrites=true&w=majority"
+        _client = MongoClient(db_uri_link)
+        #_client = MongoClient(Config.MONGO_URI, uuidRepresentation="standard")
     return _client
 
 

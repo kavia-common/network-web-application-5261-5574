@@ -20,7 +20,8 @@ def _get_client() -> MongoClient:
     global _client
     if _client is None:
         logger.info("Initializing MongoDB client")
-        _client = MongoClient(Config.MONGO_URI, uuidRepresentation="standard")
+        _client = MongoClient("ac-d4x385z-shard-00-00.htz84wq.mongodb.net:27017")
+        #_client = MongoClient(Config.MONGO_URI, uuidRepresentation="standard")
     return _client
 
 

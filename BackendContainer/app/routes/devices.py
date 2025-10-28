@@ -33,7 +33,7 @@ class DeviceSchema(Schema):
     ip_address = fields.String(required=True, description="IPv4 or IPv6 address")
     type = fields.String(required=True, description="Device type (router/switch/server)")
     location = fields.String(required=False, allow_none=True)
-    status = fields.String(required=True, validate=OneOf(["online", "offline"]))
+    status = fields.String(required=False, validate=OneOf(["online", "offline"]))
     last_ping_time = fields.String(required=False, description="ISO date-time")
 
     @validates("name")

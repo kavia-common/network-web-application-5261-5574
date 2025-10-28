@@ -53,7 +53,7 @@ class PartialDeviceSchema(Schema):
     ip_address = fields.String(required=False)
     type = fields.String(required=False)
     location = fields.String(required=False, allow_none=True)
-    status = fields.String(required=False, validate=OneOf(["online", "offline"]))
+    status = fields.String(required=True, validate=OneOf(["online", "offline"]))
     last_ping_time = fields.String(required=False)
 
 

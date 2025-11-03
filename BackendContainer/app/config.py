@@ -8,7 +8,7 @@ load_dotenv()
 
 class Config:
     """Application configuration loaded from environment variables with sensible defaults."""
-    APP_PORT: int = int(os.getenv("APP_PORT", "3001"))
+    APP_PORT: int = int(os.getenv("APP_PORT", "3002"))
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO").upper()
 
     MONGO_URI: str = os.getenv("MONGO_URI", "mongodb+srv://db_user:vettel%402012@cluster0.htz84wq.mongodb.net/network?retryWrites=true&w=majority

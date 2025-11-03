@@ -61,28 +61,27 @@ The API will be available on `http://localhost:3001` and documentation at `http:
 - POST `/devices`
   - Body: `{ "name": "...", "ip_address": "...", "type": "...", "location": "...", "status": "online|offline", "last_ping_time": "ISO-8601" }`
   - Response: `201 { "inserted_id": "<ObjectId as string>" }`
-  - Errors: `400` on validation/duplicate, `500` on DB error
+  - Errors: `400` on validation/duplicate (returns details: "A device with this name already exists"), `500` on DB error
 
 - GET `/devices`
   - Query params (optional): `name, ip_address, type, status, location, sort=name:asc, limit, skip`
   - Response: `200 [ Device, ... ]`
 
-- GET `/devices/{id}`
+- GET `/devices/{name}`
   - Response: `200 Device`
-  - Errors: `400` invalid ObjectId, `404` not found
+  - Errors: `404` not found
 
-- PUT `/devices/{id}`
+- PUT `/devices/{name}`
   - Body (full document, all required fields): `{ "name": "...", "ip_address": "...", "type": "...", "location": "...", "status": "online|offline", "last_ping_time": "ISO-8601" }`
   - Semantics: Full replace (idempotent). Returns updated device.
-  - Responses: `200 Device`, `404` if not found, `400` invalid ObjectId/payload, `409` duplicate key
+  - Responses: `200 Device`, `404` if not found, `409` duplicate key
 
-- PATCH `/devices/{id}`
+- PATCH `/devices/{name}`
   - Body (partial): any subset of fields above
-  - Responses: `200 Device`, `404` if not found, `400` invalid ObjectId/payload, `409` duplicate key
+  - Responses: `200 Device`, `404` if not found, `409` duplicate key
 
-- DELETE `/devices/{id}`
+- DELETE `/devices/{name}`
   - Response: `204` on success (no body) or `404` if not found
-  - Errors: `400` invalid ObjectId
 
 All endpoints return JSON error payloads such as:
 ```

@@ -20,8 +20,8 @@ def _get_client() -> MongoClient:
     global _client
     if _client is None:
         logger.info("Initializing MongoDB client")
-        _client = MongoClient("mongodb+srv://db_user:vettel%402012@cluster0.htz84wq.mongodb.net/network?retryWrites=true&w=majority")
-        #_client = MongoClient(Config.MONGO_URI, uuidRepresentation="standard")
+        # Use environment-configured MONGO_URI; avoid hardcoding credentials
+        _client = MongoClient(Config.MONGO_URI, uuidRepresentation="standard")
     return _client
 
 
@@ -212,6 +212,14 @@ def get_by_id(id_str: str) -> Optional[Dict[str, Any]]:
 
 
 # PUBLIC_INTERFACE
+def get_by_name(name: str) -> Optional[Dict[str, Any]]:
+    """Get a single device by unique name. Returns serialized device or None."""
+    col = get_collection()
+    doc = col.find_one({"name": name})
+    return _serialize_device(doc) if doc else None
+
+
+# PUBLIC_INTERFACE
 def replace_one_by_id(id_str: str, new_doc: Dict[str, Any]) -> Dict[str, Any]:
     """Replace a device document by id. Returns the updated document."""
     col = get_collection()
@@ -232,6 +240,26 @@ def replace_one_by_id(id_str: str, new_doc: Dict[str, Any]) -> Dict[str, Any]:
         raise
     except PyMongoError:
         logger.exception("Database error during replace")
+        raise
+
+
+# PUBLIC_INTERFACE
+def replace_one_by_name(name: str, new_doc: Dict[str, Any]) -> Dict[str, Any]:
+    """Replace a device document by name. Returns the updated document or {} if not found."""
+    col = get_collection()
+    to_set = _normalize_dates(new_doc)
+    to_set.pop("_id", None)
+    try:
+        res = col.replace_one({"name": name}, to_set, upsert=False)
+        if res.matched_count == 0:
+            return {}
+        doc = col.find_one({"name": name})
+        return _serialize_device(doc) if doc else {}
+    except DuplicateKeyError:
+        logger.info("Duplicate key error on replace by name")
+        raise
+    except PyMongoError:
+        logger.exception("Database error during replace by name")
         raise
 
 
@@ -259,6 +287,28 @@ def update_one_by_id(id_str: str, partial: Dict[str, Any]) -> Optional[Dict[str,
 
 
 # PUBLIC_INTERFACE
+def update_one_by_name(name: str, partial: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Apply a partial update to a device by name. Returns updated document or None if not found."""
+    col = get_collection()
+    update_fields = _normalize_dates(partial)
+    update_fields.pop("_id", None)
+    if not update_fields:
+        return None
+    try:
+        res = col.update_one({"name": name}, {"$set": update_fields})
+        if res.matched_count == 0:
+            return None
+        doc = col.find_one({"name": name})
+        return _serialize_device(doc) if doc else None
+    except DuplicateKeyError:
+        logger.info("Duplicate key error on partial update by name")
+        raise
+    except PyMongoError:
+        logger.exception("Database error during partial update by name")
+        raise
+
+
+# PUBLIC_INTERFACE
 def delete_one_by_id(id_str: str) -> bool:
     """Delete a device by id. Returns True if deleted, False if not found."""
     col = get_collection()
@@ -268,4 +318,16 @@ def delete_one_by_id(id_str: str) -> bool:
         return res.deleted_count == 1
     except PyMongoError:
         logger.exception("Database error during delete by id")
+        raise
+
+
+# PUBLIC_INTERFACE
+def delete_one_by_name(name: str) -> bool:
+    """Delete a device by name. Returns True if deleted, False if not found."""
+    col = get_collection()
+    try:
+        res = col.delete_one({"name": name})
+        return res.deleted_count == 1
+    except PyMongoError:
+        logger.exception("Database error during delete by name")
         raise

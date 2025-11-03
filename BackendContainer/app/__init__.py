@@ -14,8 +14,15 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 app.url_map.strict_slashes = False
 
-# CORS: allow all origins (can be restricted via env if needed)
-CORS(app, resources={r"/*": {"origins": "*"}})
+# Configure CORS using environment-driven settings.
+# Supports preflight (OPTIONS) automatically and covers all routes including /devices with query params.
+CORS(
+    app,
+    resources={r"/*": {"origins": Config.ALLOWED_ORIGINS}},
+    supports_credentials=Config.CORS_ALLOW_CREDENTIALS,
+    methods=Config.CORS_METHODS,
+    allow_headers=Config.CORS_ALLOW_HEADERS,
+)
 
 # OpenAPI/Swagger config
 app.config["API_TITLE"] = "Network Device Management API"

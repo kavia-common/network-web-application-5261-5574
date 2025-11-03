@@ -42,9 +42,15 @@ LOG_LEVEL=INFO
 MONGO_URI=mongodb://localhost:27017
 MONGO_DB_NAME=network_devices
 MONGO_COLLECTION=devices
+
+# CORS
+ALLOWED_ORIGINS=https://network-web-application-1.kavia.app
+CORS_ALLOW_CREDENTIALS=true
+CORS_METHODS=GET,POST,PUT,PATCH,DELETE,OPTIONS
+CORS_ALLOW_HEADERS=Content-Type,Authorization,X-Requested-With
 ```
 
-Sensible defaults are applied if variables are not set.
+Sensible defaults are applied if variables are not set. By default, the backend allows the deployed frontend origin. For development, you may use `ALLOWED_ORIGINS="*"` (not recommended for production).
 
 ## Running
 

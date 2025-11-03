@@ -18,6 +18,25 @@ class Config:
     MONGO_DB_NAME: str = os.getenv("MONGO_DB_NAME", "network_devices")
     MONGO_COLLECTION: str = os.getenv("MONGO_COLLECTION", "devices")
 
+    # CORS configuration
+    # Comma-separated list of allowed origins. If not provided, default to the known frontend URL.
+    # For development, you may set to "*" (wildcard) to allow all origins.
+    FRONTEND_DEFAULT_ORIGIN: str = "https://network-web-application-1.kavia.app"
+    ALLOWED_ORIGINS_RAW: str = os.getenv("ALLOWED_ORIGINS", FRONTEND_DEFAULT_ORIGIN)
+    # Normalize to list; accept comma-separated items and strip spaces
+    ALLOWED_ORIGINS: list[str] = [o.strip() for o in ALLOWED_ORIGINS_RAW.split(",") if o.strip()]
+
+    # Allowed HTTP methods and headers for CORS
+    CORS_ALLOW_CREDENTIALS: bool = os.getenv("CORS_ALLOW_CREDENTIALS", "true").lower() == "true"
+    CORS_METHODS: list[str] = [m.strip() for m in os.getenv(
+        "CORS_METHODS",
+        "GET,POST,PUT,PATCH,DELETE,OPTIONS"
+    ).split(",") if m.strip()]
+    CORS_ALLOW_HEADERS: list[str] = [h.strip() for h in os.getenv(
+        "CORS_ALLOW_HEADERS",
+        "Content-Type,Authorization,X-Requested-With"
+    ).split(",") if h.strip()]
+
 
 def setup_logging(level: str) -> None:
     """Configure root logging according to the provided level."""
